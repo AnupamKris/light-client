@@ -32,7 +32,7 @@ export function ResponseInfo({
       <div className="p-4 bg-muted rounded-lg space-y-2">
         <div className="text-sm text-muted-foreground flex items-center gap-2">
           <Activity className="w-4 h-4" />
-          Statusa
+          Status - {statusText}
         </div>
         <div
           className={cn(

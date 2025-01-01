@@ -4,14 +4,12 @@ import { RequestUrl } from "@/components/RequestUrl";
 import { RequestHeaders } from "@/components/RequestHeaders";
 import { QueryParams } from "@/components/QueryParams";
 import { RequestBody } from "@/components/RequestBody";
-import { ResponseInfo } from "@/components/ResponseInfo";
 import { ResponseBody } from "@/components/ResponseBody";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { Loader2 } from "lucide-react";
 import {
   Table,
   TableBody,
-  TableCaption,
   TableCell,
   TableHead,
   TableHeader,

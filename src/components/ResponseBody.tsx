@@ -260,7 +260,7 @@ export function ResponseBody({
         <div className="bg-muted/50 rounded-md">
           <pre
             className={cn(
-              "whitespace-pre-wrap font-mono text-sm p-4 max-h-[500px] overflow-auto",
+              "whitespace-pre-wrap font-mono text-sm p-4 max-h-  overflow-auto",
               responseFormat === "raw" && "whitespace-pre overflow-x-auto"
             )}
           >

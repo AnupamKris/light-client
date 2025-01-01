@@ -8,6 +8,15 @@ import { ResponseInfo } from "@/components/ResponseInfo";
 import { ResponseBody } from "@/components/ResponseBody";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { Loader2 } from "lucide-react";
+import {
+  Table,
+  TableBody,
+  TableCaption,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import type {
   Header,
   FormDataItem,
@@ -286,7 +295,7 @@ function App() {
             }
             className="flex-1"
           >
-            <TabsList className="border-b bg-background w-full flex justify-start rounded-none">
+            <TabsList className="border-b bg-background w-full flex justify-start rounded-none h-10">
               <TabsTrigger value="headers">Headers</TabsTrigger>
               <TabsTrigger
                 value="params"
@@ -348,12 +357,12 @@ function App() {
               }
               className="flex-1 flex flex-col"
             >
-              <div className="flex items-center justify-between border-b px-4">
-                <TabsList className="bg-background w-full flex justify-start rounded-none">
+              <div className="flex items-center justify-between border-b px-4 h-10 overflow-hidden">
+                <TabsList className="bg-background w-full flex justify-start rounded-none h-10">
                   <TabsTrigger value="body">Body</TabsTrigger>
                   <TabsTrigger value="headers">Headers</TabsTrigger>
                 </TabsList>
-                <div className="flex items-center gap-4 py-2 min-w-fit">
+                <div className="flex items-center gap-4 py-1 min-w-fit">
                   <div
                     className={cn(
                       "text-sm font-medium",
@@ -393,18 +402,30 @@ function App() {
                 </TabsContent>
 
                 <TabsContent value="headers" className="m-0 h-full">
-                  <div className="p-4 space-y-2">
-                    {response.rawResponse?.headers &&
-                      Array.from(response.rawResponse.headers.entries()).map(
-                        ([key, value]) => (
-                          <div key={key} className="flex gap-4">
-                            <div className="font-medium">{key}:</div>
-                            <div className="text-muted-foreground font-mono">
-                              {value}
-                            </div>
-                          </div>
-                        )
-                      )}
+                  <div className="p-4">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="w-[200px]">Header</TableHead>
+                          <TableHead>Value</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {response.rawResponse?.headers &&
+                          Array.from(
+                            response.rawResponse.headers.entries()
+                          ).map(([key, value]) => (
+                            <TableRow key={key}>
+                              <TableCell className="font-medium">
+                                {key}
+                              </TableCell>
+                              <TableCell className="font-mono text-muted-foreground">
+                                {value}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                      </TableBody>
+                    </Table>
                   </div>
                 </TabsContent>
               </div>

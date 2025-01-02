@@ -16,6 +16,7 @@ import {
   FileCode,
 } from "lucide-react";
 import { formatBytes } from "@/lib/utils";
+import { MonacoEditor } from "@/components/ui/monaco-editor";
 
 interface ResponseBodyProps {
   data: any;
@@ -234,8 +235,8 @@ export function ResponseBody({
 
   if (isJson) {
     return (
-      <>
-        <div className="flex justify-between items-center mb-4">
+      <div className="flex flex-col h-full">
+        <div className="flex justify-between items-center mb-4 flex-shrink-0">
           <div className="text-sm font-medium">Response Body</div>
           <div className="flex items-center gap-2">
             <Select
@@ -257,19 +258,18 @@ export function ResponseBody({
             </Button>
           </div>
         </div>
-        <div className="bg-muted/50 rounded-md">
-          <pre
-            className={cn(
-              "whitespace-pre-wrap font-mono text-sm p-4 max-h-  overflow-auto",
-              responseFormat === "raw" && "whitespace-pre overflow-x-auto"
-            )}
-          >
-            {responseFormat === "formatted"
-              ? JSON.stringify(data, null, 2)
-              : JSON.stringify(data)}
-          </pre>
+        <div className="flex-1 min-h-0">
+          <MonacoEditor
+            value={
+              responseFormat === "formatted"
+                ? JSON.stringify(data, null, 2)
+                : JSON.stringify(data)
+            }
+            onChange={() => {}} // Read-only
+            readOnly={true}
+          />
         </div>
-      </>
+      </div>
     );
   }
 

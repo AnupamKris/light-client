@@ -6,7 +6,15 @@ import { QueryParams } from "@/components/QueryParams";
 import { RequestBody } from "@/components/RequestBody";
 import { ResponseBody } from "@/components/ResponseBody";
 import { ThemeToggle } from "@/components/ThemeToggle";
-import { Loader2 } from "lucide-react";
+import {
+  AppWindow,
+  Globe,
+  Loader2,
+  ShieldAlert,
+  ShieldCheck,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { fetch as tauriFetch } from "@tauri-apps/plugin-http";
 import {
   Table,
   TableBody,
@@ -46,6 +54,7 @@ function App() {
   const [blobUrl, setBlobUrl] = useState<string | null>(null);
   const timerRef = useRef<NodeJS.Timeout>();
   const startTimeRef = useRef<number>();
+  const [corsDisabled, setCorsDisabled] = useState(true);
 
   // Parse URL when it changes
   useEffect(() => {
@@ -135,6 +144,7 @@ function App() {
     startTimer();
     setResponse(null);
     setRequestTab("params");
+    setResponseTab("body");
 
     try {
       const headerObj: { [key: string]: string } = {};
@@ -157,8 +167,13 @@ function App() {
 
       if (method === "POST") {
         if (bodyType === "json") {
-          body = jsonBody;
-          headerObj["Content-Type"] = "application/json";
+          try {
+            // Parse JSON to ensure it's valid and convert to string
+            body = JSON.stringify(JSON.parse(jsonBody));
+            headerObj["Content-Type"] = "application/json";
+          } catch (e) {
+            throw new Error("Invalid JSON body");
+          }
         } else {
           const formDataObj = new FormData();
           formData.forEach((item) => {
@@ -171,50 +186,103 @@ function App() {
       }
 
       const startTime = Date.now();
-      const response = await fetch(finalUrl, {
-        method,
-        headers: headerObj,
-        body: method === "POST" ? body : undefined,
-      });
+      let responseData: Response;
 
-      const contentType = response.headers.get("content-type") || "unknown";
+      if (corsDisabled) {
+        // Use Tauri's HTTP plugin
+        const tauriResponse = await tauriFetch(finalUrl, {
+          method,
+          headers: headerObj,
+          body: method === "POST" ? body : undefined,
+        });
+
+        const responseBody = await tauriResponse.text();
+        const contentTypeHeader = tauriResponse.headers.get("content-type");
+
+        // Convert Tauri response to web Response
+        responseData = new Response(responseBody, {
+          status: tauriResponse.status,
+          statusText: tauriResponse.status.toString(),
+          headers: new Headers({
+            "content-type": contentTypeHeader || "text/plain",
+          }),
+        });
+      } else {
+        // Use browser's fetch API
+        responseData = await fetch(finalUrl, {
+          method,
+          headers: headerObj,
+          body: method === "POST" ? body : undefined,
+        });
+      }
+
+      const contentType = responseData.headers.get("content-type") || "unknown";
       const timeElapsed = Date.now() - startTime;
-      const clonedResponse = response.clone();
 
       let data: any;
       let size: number | undefined;
 
-      if (contentType.includes("application/json")) {
-        data = await response.json();
-      } else if (contentType.includes("text/html")) {
-        data = await response.text();
-        size = new Blob([data]).size;
-      } else if (contentType.includes("text")) {
-        data = await response.text();
-        size = new Blob([data]).size;
-      } else {
-        const blob = await response.blob();
-        size = blob.size;
-        data = null;
-      }
+      try {
+        if (contentType.includes("application/json")) {
+          const text = await responseData.clone().text();
+          try {
+            data = JSON.parse(text);
+          } catch (parseError) {
+            data = text; // If JSON parsing fails, show the raw text
+          }
+        } else if (
+          contentType.includes("text/html") ||
+          contentType.includes("text")
+        ) {
+          data = await responseData.clone().text();
+          size = new Blob([data]).size;
+        } else {
+          const blob = await responseData.clone().blob();
+          size = blob.size;
+          data = null;
+        }
 
-      setResponse({
-        data,
-        status: response.status,
-        statusText: response.statusText,
-        time: timeElapsed,
-        contentType,
-        rawResponse: clonedResponse,
-        size,
-      });
+        setResponse({
+          data,
+          status: responseData.status,
+          statusText: responseData.statusText || responseData.status.toString(),
+          time: timeElapsed,
+          contentType,
+          rawResponse: responseData,
+          size,
+        });
+      } catch (processError: unknown) {
+        console.error(processError);
+        const errorMessage =
+          processError instanceof Error
+            ? processError.message
+            : "Failed to process response";
+        throw new Error(`Failed to process response: ${errorMessage}`);
+      }
     } catch (error: any) {
-      setResponse({
-        data: { error: error.message || "An error occurred" },
-        status: 0,
-        statusText: "Error",
+      console.error(error);
+      // Check if it's a CORS error
+      const isCorsError =
+        error instanceof TypeError &&
+        (error.message.includes("CORS") ||
+          error.message.includes("Failed to fetch") ||
+          error.message.includes("Network request failed"));
+
+      const errorResponse = {
+        data: {
+          error: isCorsError
+            ? "CORS Error: The server doesn't allow requests from this origin. Try enabling CORS on the server or using the CORS bypass button."
+            : error.message || "An error occurred",
+          details: error.message,
+        },
+        status: isCorsError ? 0 : 500,
+        statusText: isCorsError ? "CORS Error" : "Error",
         time: Date.now() - (startTimeRef.current || 0),
-        contentType: "error",
-      });
+        contentType: "application/json",
+      };
+
+      setResponse(errorResponse);
+      setResponseTab("body");
     } finally {
       setIsLoading(false);
       stopTimer();
@@ -266,7 +334,31 @@ function App() {
       {/* Header */}
       <div className="flex justify-between items-center p-4 border-b">
         <h1 className="text-2xl font-bold">API Client</h1>
-        <ThemeToggle />
+        <div className="flex items-center gap-4">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setCorsDisabled(!corsDisabled)}
+            className={cn(
+              "gap-2",
+              corsDisabled &&
+                "bg-yellow-500/10 hover:bg-yellow-500/20 text-yellow-500"
+            )}
+          >
+            {corsDisabled ? (
+              <>
+                <AppWindow className="h-4 w-4" />
+                Rust
+              </>
+            ) : (
+              <>
+                <Globe className="h-4 w-4" />
+                Browser
+              </>
+            )}
+          </Button>
+          <ThemeToggle />
+        </div>
       </div>
 
       {/* URL Bar */}
@@ -291,9 +383,9 @@ function App() {
             onValueChange={(value) =>
               setRequestTab(value as "headers" | "params")
             }
-            className="flex-1"
+            className="flex-1 flex flex-col"
           >
-            <TabsList className="border-b bg-background w-full flex justify-start rounded-none h-10">
+            <TabsList className="border-b bg-background w-full flex justify-start rounded-none h-10 flex-shrink-0">
               <TabsTrigger value="headers">Headers</TabsTrigger>
               <TabsTrigger
                 value="params"
@@ -307,30 +399,34 @@ function App() {
               </TabsTrigger>
             </TabsList>
 
-            <div className="p-4 flex-1 overflow-auto">
-              <TabsContent value="headers" className="m-0">
-                <RequestHeaders
-                  headers={headers}
-                  onHeadersChange={setHeaders}
-                />
+            <div className="flex-1 overflow-auto">
+              <TabsContent value="headers" className="m-0 h-full">
+                <div className="p-4 h-full">
+                  <RequestHeaders
+                    headers={headers}
+                    onHeadersChange={setHeaders}
+                  />
+                </div>
               </TabsContent>
 
-              <TabsContent value="params" className="m-0">
-                {method === "GET" ? (
-                  <QueryParams
-                    params={queryParams}
-                    onParamsChange={setQueryParams}
-                  />
-                ) : (
-                  <RequestBody
-                    bodyType={bodyType}
-                    jsonBody={jsonBody}
-                    formData={formData}
-                    onBodyTypeChange={setBodyType}
-                    onJsonBodyChange={setJsonBody}
-                    onFormDataChange={setFormData}
-                  />
-                )}
+              <TabsContent value="params" className="m-0 h-full">
+                <div className="p-4 h-full">
+                  {method === "GET" ? (
+                    <QueryParams
+                      params={queryParams}
+                      onParamsChange={setQueryParams}
+                    />
+                  ) : (
+                    <RequestBody
+                      bodyType={bodyType}
+                      jsonBody={jsonBody}
+                      formData={formData}
+                      onBodyTypeChange={setBodyType}
+                      onJsonBodyChange={setJsonBody}
+                      onFormDataChange={setFormData}
+                    />
+                  )}
+                </div>
               </TabsContent>
             </div>
           </Tabs>
@@ -355,7 +451,7 @@ function App() {
               }
               className="flex-1 flex flex-col"
             >
-              <div className="flex items-center justify-between border-b px-4 h-10 overflow-hidden">
+              <div className="flex items-center justify-between border-b px-4 h-10 overflow-hidden flex-shrink-0">
                 <TabsList className="bg-background w-full flex justify-start rounded-none h-10">
                   <TabsTrigger value="body">Body</TabsTrigger>
                   <TabsTrigger value="headers">Headers</TabsTrigger>
@@ -386,7 +482,7 @@ function App() {
 
               <div className="flex-1 overflow-auto">
                 <TabsContent value="body" className="m-0 h-full">
-                  <div className="p-4">
+                  <div className="p-4 h-full">
                     <ResponseBody
                       data={response.data}
                       contentType={response.contentType}
@@ -400,7 +496,7 @@ function App() {
                 </TabsContent>
 
                 <TabsContent value="headers" className="m-0 h-full">
-                  <div className="p-4">
+                  <div className="p-4 h-full">
                     <Table>
                       <TableHeader>
                         <TableRow>

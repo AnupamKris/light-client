@@ -1,5 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { MonacoEditor } from "@/components/ui/monaco-editor";
 import {
   Select,
   SelectContent,
@@ -39,8 +40,8 @@ export function RequestBody({
   };
 
   return (
-    <div>
-      <div className="flex items-center justify-between mb-4">
+    <div className="flex flex-col h-full">
+      <div className="flex items-center justify-between mb-4 flex-shrink-0">
         <div className="text-sm font-medium">Request Body</div>
         <Select value={bodyType} onValueChange={onBodyTypeChange}>
           <SelectTrigger className="w-[150px]">
@@ -54,12 +55,12 @@ export function RequestBody({
       </div>
 
       {bodyType === "json" ? (
-        <textarea
-          className="w-full h-64 p-2 border rounded-md font-mono"
-          value={jsonBody}
-          onChange={(e) => onJsonBodyChange(e.target.value)}
-          placeholder="Enter JSON body"
-        />
+        <div className="flex-1 min-h-0">
+          <MonacoEditor
+            value={jsonBody}
+            onChange={(value) => onJsonBodyChange(value || "")}
+          />
+        </div>
       ) : (
         <>
           <div className="flex items-center justify-between mb-4">
